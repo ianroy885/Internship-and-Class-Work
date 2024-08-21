@@ -1,0 +1,202 @@
+---
+title: "Project"
+author: "Ian McCarthy"
+date: "2024-02-07"
+output: html_document
+---
+
+```{r}
+
+library(Hmisc)
+load(file='36346-0001-Data.rda')
+tempdata <- da36346.0001[, c("M2ID",
+"SAMPLMAJ",
+"C1PRAGE",
+"C1PRSEX",
+"C1PA1",
+"C1PA2",
+"C1PA3",
+"C1PA39",
+"C1PA59",
+"C1PDEPAF",
+"C1PANHED",
+"C1PDEPRE",
+"C1PANXIE",
+"C1PPANIC",
+"C1PPARTN",
+"C1PB32A",
+"C1PD1",
+"C1PF1",
+"C1PF12A",
+"C1SSATIS2",
+"C1SHLOCS",
+"C1SAMPLI",
+"C1SA15",
+"C1SNEGAF",
+"C1SNEGPA",
+"C1SPOSAF",
+"C1SPOSPA",
+"C1SBADL2",
+"C1SIADL",
+"C1SINTAG",
+"C1SWSTHI",
+"C1SBMI",
+"C1SPWBA1",
+"C1SPWBE1",
+"C1SPWBG1",
+"C1SPWBR1",
+"C1SPWBU1",
+"C1SPWBS1",
+"C1SPWBA2",
+"C1SPWBE2",
+"C1SPWBG2",
+"C1SPWBR2",
+"C1SPWBU2",
+"C1SPWBS2",
+"C1SMPQWB",
+"C1SMPQSP",
+"C1SMPQAC",
+"C1SMPQSC",
+"C1SMPQSR",
+"C1SMPQAG",
+"C1SMPQAL",
+"C1SMPQCN",
+"C1SMPQTR",
+"C1SMPQHA",
+"C1SOPTIM",
+"C1SPESSI",
+"C1SREINT",
+"C1SACTIV",
+"C1SPLAN",
+"C1SVENT",
+"C1SDENIA",
+"C1SDISEN",
+"C1SPRCOP",
+"C1SEMCOP",
+"C1SSWBSI",
+"C1SSWBAO",
+"C1SSWBSC",
+"C1SSWBSA",
+"C1SSYMP",
+"C1SMNDFU",
+"C1SLFEDI",
+"C1SP3",
+"C1SP4A",
+"C1SP4B",
+"C1SP4C",
+"C1SP4D",
+"C1SP4E",
+"C1SP4F",
+"C1SP4G",
+"C1SP4H",
+"C1SP4I",
+"C1SP4J",
+"C1SP4K",
+"C1SP4L",
+"C1SQ1",
+"C1SQ4",
+"C1PA25BS"
+)] 
+table(tempdata$SAMPLMAJ) 
+psc103Adata <-  tempdata[tempdata$SAMPLMAJ %in% c("(01) MAIN RDD", "(04) CITY OVERSAMPLE" ), ]
+```
+
+```{r}
+health_locus <- psc103Adata$C1SHLOCS
+class(married_cohabit)
+married_cohabit <- psc103Adata$C1PPARTN
+length(health_locus)
+length(married_cohabit)
+
+married_cohabit <- psc103Adata$C1PPARTN
+class(married_cohabit)
+```
+
+```{r}
+data_yes <- psc103Adata[psc103Adata$C1PPARTN %in% c("(1) YES"), ]
+data_no <- psc103Adata[psc103Adata$C1PPARTN %in% c("(2) NO"), ]
+health_locus_yes <- data_yes$C1SHLOCS
+health_locus_no <- data_no$C1SHLOCS
+hist(health_locus_yes,
+          freq = F,
+     col = 2,
+     breaks = 35,
+     xlab = "Health Locus of Control Score",
+     xlim = c(1,8),
+     ylim = c(0,2.0))
+hist(health_locus_no,
+     freq = F,
+     col = 3,
+     breaks = 35,
+     xlim = c(1,8),
+     
+     add = T
+     )
+legend("topleft", c("Married/Cohabitating", "Not Married/Cohabitating"), col=c(2, 3), lwd=10)
+```
+
+```{r}
+psc103Adata$C1PPARTN <- factor(x = psc103Adata$C1PPARTN,
+                              levels = c("(1) YES","(2) NO"),  
+                              labels = c("YES", "NO"))
+boxplot(psc103Adata$C1SHLOCS ~ psc103Adata$C1PPARTN, 
+        main = "Health Locus of Control by Marriage/Cohabitation Status",
+        ylab = "Health Locus of Control",
+        xlab = "Marriage/Cohabitation Status")
+```
+
+```{r}
+options(scipen = 100)
+qqnorm(health_locus_yes,
+       main = "Married or Cohabitating HLC QQ Plot")
+qqline(health_locus_yes)
+qqnorm(health_locus_no,
+       main = "Non-Married or Non-Cohabitating HLC QQ Plot")
+qqline(health_locus_no)
+qqnorm(health_locus,
+       main = "SHLC QQ Plot, All Participants")
+qqline(y = health_locus)
+
+shapiro.test(health_locus_yes) #question 6
+shapiro.test(health_locus_no)
+
+hist(health_locus_no)
+hist(health_locus_yes)
+```
+
+```{r}
+max(health_locus_no, na.rm = T)
+max(health_locus_yes, na.rm = T)
+
+HLC_unmarried <- health_locus_no[!is.na(health_locus_no)]
+HLC_married <- health_locus_yes[!is.na(health_locus_yes)]
+
+hlc_unmarried_t <- c(log(HLC_unmarried - 2)^.5)
+shapiro.test(hlc_unmarried_t)
+
+hlc_married_t <- c(log((HLC_married))
+
+shapiro.test(hlc_married_t)
+
+
+hist(hlc_married_t)
+hist(hlc_unmarried_t)
+```
+```{r}
+
+length(HLC_unmarried)
+length(HLC_married)
+475+1044
+length(health_locus) - (475+1044)
+mean(HLC_unmarried)
+sd(HLC_unmarried)
+mean(HLC_married)
+sd(HLC_married)
+t.test(x = HLC_unmarried,
+       y = HLC_married,
+       alternative = "less",
+       paired = F,
+       var.equal = F)
+```
+
+
