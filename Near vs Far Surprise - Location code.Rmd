@@ -1,0 +1,382 @@
+---
+title: "Stage2 RT, Loc, Near vs Far"
+author: "Ian McCarthy"
+date: "2024-02-22"
+output: html_document
+---
+
+
+```{r}
+## GATHERING ALL OF THE LOCATIONS PER PARTICIPANT
+
+
+#fixing data, the data and expe are swapped so it's messing up the loops
+training_list[["CA2step_S09_training_r3_20221103-1201"]][[3]] <- training_list[["CA2step_S09_training_r3_20221103-1201"]][["expe"]]
+training_list[["CA2step_S13_training_r3_20221117-1218"]][[3]] <- training_list[["CA2step_S13_training_r3_20221117-1218"]][["expe"]]
+training_list[["CA2step_S37_training_r3_20230307-1739"]][[3]] <- training_list[["CA2step_S37_training_r3_20230307-1739"]][["expe"]]
+training_list[["CA2step_S39_training_r3_20230228-1646"]][[3]] <-  training_list[["CA2step_S39_training_r3_20230228-1646"]][["expe"]]
+
+training_list[["CA2step_S09_training_r3_20221103-1201"]][[1]] <- training_list[["CA2step_S09_training_r3_20221103-1201"]][[2]]
+training_list[["CA2step_S13_training_r3_20221117-1218"]][[1]] <- training_list[["CA2step_S13_training_r3_20221117-1218"]][[2]]
+training_list[["CA2step_S37_training_r3_20230307-1739"]][[1]] <- training_list[["CA2step_S37_training_r3_20230307-1739"]][[2]]
+training_list[["CA2step_S39_training_r3_20230228-1646"]][[1]] <-  training_list[["CA2step_S39_training_r3_20230228-1646"]][[2]]
+
+
+#assigning fmri1 locations
+loc_mat_fmri1 <- matrix(nrow = 34, ncol = 180, byrow = F)
+for (x in c(1:34)){
+  loc_mat_fmri1[x,] <- c(
+                   fmri1_list[[x]][[1]][[5]][[5]],
+                   fmri1_list[[x]][[1]][[11]][[5]],
+                   fmri1_list[[x]][[1]][[17]][[5]])
+}
+
+#assigning fmri2 locations (with missing data added)
+loc_mat_fmri2 <- matrix(nrow = 34, ncol = 180, byrow = F)
+
+  #missing data
+loc_mat_fmri2[1,] <- rep(NaN, 180)
+loc_mat_fmri2[14,] <- rep(NaN, 180)
+loc_mat_fmri2[15,] <- rep(NaN, 180)
+
+  #cause subj 9 stores in subj 1
+loc_mat_fmri2[9,] <- c(fmri2_list[[1]][[1]][[5]][[5]],
+                       fmri2_list[[1]][[1]][[11]][[5]],
+                       fmri2_list[[1]][[1]][[17]][[5]])
+
+fmri2_proper_data <- c(2:8,10:13,16:34)
+fmri2_list_indices <- c(2:31)
+
+for (i in fmri2_list_indices){
+  for (x in fmri2_proper_data){
+  loc_mat_fmri2[x,] <- c(
+                   fmri2_list[[i]][[1]][[5]][[5]],
+                   fmri2_list[[i]][[1]][[11]][[5]],
+                   fmri2_list[[i]][[1]][[17]][[5]])
+  }
+}
+
+#assigning training locations (with some extra stuff)
+
+loc_mat_training <- matrix(nrow = 34, ncol = 180, byrow = F)
+
+#subject 43 has missing data for run 1, just replacing it like this to get same format, but will replace the loc with NAN
+training_list[["CA2step_S43_training_r3_20230825-1419"]][["data"]][[3]] <- training_list[["CA2step_S43_training_r3_20230825-1419"]][["data"]][[7]]
+
+training_list[["CA2step_S43_training_r3_20230825-1419"]][["data"]][[3]][[5]] <- rep(NaN, 60)
+
+
+for (x in 1:34){
+  loc_mat_training[x,] <- c(
+                   training_list[[x]][[1]][[3]][[5]],
+                   training_list[[x]][[1]][[7]][[5]],
+                   training_list[[x]][[1]][[11]][[5]])
+}
+
+#one big matrix with combined locations
+loc_mat <- matrix(nrow = 34, ncol = 540, byrow = F)
+
+for (x in 1:34){
+  loc_mat[x,] <- c(loc_mat_fmri1[x,],loc_mat_fmri2[x,],loc_mat_training[x,])
+}
+
+#replace NaNs with 10 so then the loop below can run
+loc_mat <- replace(loc_mat, is.nan(loc_mat), 10)
+
+```
+
+
+```{r}
+#now assigning baselined/outlier removed rt to the specific location conditions
+
+performance_cost_list_loc <- list("Stable(t) Rare(t+1) Near" = 
+                                vector(mode = "list", length = 2), 
+                              "Stable(t) Rare(t+1) Far" = 
+                                vector(mode = "list", length = 2)
+                                )
+performance_cost_list_loc[[1]][[1]] <- vector(mode = "list", length = 34)
+performance_cost_list_loc[[1]][[2]] <- vector(mode = "list", length = 34)
+performance_cost_list_loc[[2]][[1]] <- vector(mode = "list", length = 34)
+performance_cost_list_loc[[2]][[2]] <- vector(mode = "list", length = 34)
+
+
+
+all_trials <- c(3:179, 183:359, 363:539)
+
+for (i in 1:34) {
+    for (x in all_trials) { 
+      
+  #t-2,t-1, or t is location 1
+  if (loc_mat[i,x-2] == 1 && loc_mat[i,x-1] == 2 && loc_mat[i,x] == 2| 
+      loc_mat[i,x-1] == 1 && loc_mat[i,x] == 2| 
+      loc_mat[i,x] == 1){
+    
+    #if t+1 matches that
+    if (loc_mat[i,x+1] == 1){
+      performance_cost_list_loc[[1]][[1]][[i]] <- c(performance_cost_list_loc[[1]][[1]][[i]],
+                                                    prepped_stage2_rt[[i]][[x+1]])
+    }
+  }
+  #other loc
+  else if (loc_mat[i,x-2] == 2 && loc_mat[i,x-1] == 1 && loc_mat[i,x] == 1| 
+      loc_mat[i,x-1] == 2 && loc_mat[i,x] == 1| 
+      loc_mat[i,x] == 2) {
+    
+    #if t+1 matches other loc 
+    if (loc_mat[i,x+1] == 2) {
+      
+      #it is near, so combine the ones that match with that with the specific RTs
+      performance_cost_list_loc[[1]][[2]][[i]] <- c(performance_cost_list_loc[[1]][[2]][[i]], 
+                                                    prepped_stage2_rt[[i]][[x+1]])
+      }
+  }
+      
+  #if experienced loc 2
+    if (loc_mat[i,x-2] == 2 && loc_mat[i,x-1] == 2 && loc_mat[i,x] == 2| 
+      loc_mat[i,x-1] == 2 && loc_mat[i,x] == 2| 
+      loc_mat[i,x] == 2){
+      
+      #but experienced alternate
+      if (loc_mat[i,x+1] == 1){
+        performance_cost_list_loc[[2]][[1]][[i]] <- c(performance_cost_list_loc[[2]][[1]][[i]],
+                                                    prepped_stage2_rt[[i]][[x+1]])
+      }
+    }
+      
+    #if experience loc 1   
+  else if (loc_mat[i,x-2] == 1 && loc_mat[i,x-1] == 1 && loc_mat[i,x] == 1| 
+      loc_mat[i,x-1] == 1 && loc_mat[i,x] == 1| 
+      loc_mat[i,x] == 1)
+    {
+      
+       #and experience alternate
+        if (loc_mat[i,x+1] == 2) {
+        #it is far, so combine the ones that match with that with the specific RTs
+         performance_cost_list_loc[[2]][[2]][[i]] <- c(performance_cost_list_loc[[2]][[2]][[i]],
+                                                    prepped_stage2_rt[[i]][[x+1]])
+        }
+    }
+  }
+}
+```
+
+
+Means and sem 
+```{r}
+NF_loc_mean <- performance_cost_list_loc
+         
+for (x in 1:34){
+  NF_loc_mean[["Stable(t) Rare(t+1) Near"]][[1]][[x]] <- mean(NF_loc_mean[["Stable(t) Rare(t+1) Near"]][[1]][[x]], na.rm = T)
+  NF_loc_mean[["Stable(t) Rare(t+1) Near"]][[2]][[x]] <- mean(NF_loc_mean[["Stable(t) Rare(t+1) Near"]][[2]][[x]], na.rm = T)
+  NF_loc_mean[["Stable(t) Rare(t+1) Far"]][[1]][[x]] <- mean(NF_loc_mean[["Stable(t) Rare(t+1) Far"]][[1]][[x]], na.rm = T)
+  NF_loc_mean[["Stable(t) Rare(t+1) Far"]][[2]][[x]] <- mean(NF_loc_mean[["Stable(t) Rare(t+1) Far"]][[2]][[x]], na.rm = T)
+}
+
+sem <- function(x) {
+  sd(x, na.rm = T) / sqrt(length(x[!is.na(x[])]))
+}
+
+near_SEM_loc1 <- c()
+near_SEM_loc2 <- c()
+far_SEM_loc1 <- c()
+far_SEM_loc2 <- c()
+
+for (x in 1:34){
+  near_SEM_loc1[x] <- c(sd(performance_cost_list_loc[[1]][[1]][[x]], na.rm =T) /        sqrt(length(performance_cost_list_loc[!is.na(performance_cost_list_loc[[1]][[1]][[x]])])))
+  
+  near_SEM_loc2[x] <- c(sd(performance_cost_list_loc[[1]][[2]][[x]], na.rm =T) /        sqrt(length(performance_cost_list_loc[!is.na(performance_cost_list_loc[[1]][[2]][[x]])])))
+                
+  far_SEM_loc1[x] <- c(sd(performance_cost_list_loc[[2]][[1]][[x]], na.rm =T) /        sqrt(length(performance_cost_list_loc[!is.na(performance_cost_list_loc[[2]][[1]][[x]])])))
+  
+  far_SEM_loc2[x] <- c(sd(performance_cost_list_loc[[2]][[2]][[x]], na.rm =T) /        sqrt(length(performance_cost_list_loc[!is.na(performance_cost_list_loc[[2]][[2]][[x]])])))
+}
+```
+
+
+
+
+
+
+
+
+
+No baseline
+```{r}
+#now without baselined rts
+
+performance_cost_listNB_loc <- list("Stable(t) Rare(t+1) Near" = 
+                                vector(mode = "list", length = 2), 
+                              "Stable(t) Rare(t+1) Far" = 
+                                vector(mode = "list", length = 2)
+                                )
+performance_cost_listNB_loc[[1]][[1]] <- vector(mode = "list", length = 34)
+performance_cost_listNB_loc[[1]][[2]] <- vector(mode = "list", length = 34)
+performance_cost_listNB_loc[[2]][[1]] <- vector(mode = "list", length = 34)
+performance_cost_listNB_loc[[2]][[2]] <- vector(mode = "list", length = 34)
+
+for (i in 1:34) {
+    for (x in all_trials) { 
+      
+  #t-2,t-1, or t is location 1
+  if (loc_mat[i,x-2] == 1 && loc_mat[i,x-1] == 2 && loc_mat[i,x] == 2| 
+      loc_mat[i,x-1] == 1 && loc_mat[i,x] == 2| 
+      loc_mat[i,x] == 1){
+    
+    #if t+1 matches that
+    if (loc_mat[i,x+1] == 1){
+      performance_cost_listNB_loc[[1]][[1]][[i]] <- c(performance_cost_listNB_loc[[1]][[1]][[i]],
+                                                    no_outlier[[i]][[x+1]])
+    }
+  }
+  #other loc
+  else if (loc_mat[i,x-2] == 2 && loc_mat[i,x-1] == 1 && loc_mat[i,x] == 1| 
+      loc_mat[i,x-1] == 2 && loc_mat[i,x] == 1| 
+      loc_mat[i,x] == 2) {
+    
+    #if t+1 matches other loc 
+    if (loc_mat[i,x+1] == 2) {
+      
+      #it is near, so combine the ones that match with that with the specific RTs
+      performance_cost_listNB_loc[[1]][[2]][[i]] <- c(performance_cost_listNB_loc[[1]][[2]][[i]], 
+                                                    no_outlier[[i]][[x+1]])
+      }
+  }
+     
+    #if experienced loc 2
+    if (loc_mat[i,x-2] == 2 && loc_mat[i,x-1] == 2 && loc_mat[i,x] == 2| 
+      loc_mat[i,x-1] == 2 && loc_mat[i,x] == 2| 
+      loc_mat[i,x] == 2){
+      
+      #but experienced alternate
+      if (loc_mat[i,x+1] == 1){
+        performance_cost_listNB_loc[[2]][[1]][[i]] <- c(performance_cost_listNB_loc[[2]][[1]][[i]],
+                                                    no_outlier[[i]][[x+1]])
+      }
+    }      
+ 
+    #if experience loc 1   
+  else if (loc_mat[i,x-2] == 1 && loc_mat[i,x-1] == 1 && loc_mat[i,x] == 1| 
+      loc_mat[i,x-1] == 1 && loc_mat[i,x] == 1| 
+      loc_mat[i,x] == 1)
+    {
+      
+       #and experience alternate
+        if (loc_mat[i,x+1] == 2) {
+        #it is far, so combine the ones that match with that with the specific RTs
+         performance_cost_listNB_loc[[2]][[2]][[i]] <- c(performance_cost_listNB_loc[[2]][[2]][[i]],
+                                                    no_outlier[[i]][[x+1]])
+        }
+    }
+  }
+}
+```
+
+No baseline
+```{r}
+#for NB
+NF_loc_meanNB <- performance_cost_listNB_loc
+         
+for (x in 1:34){
+  NF_loc_meanNB[["Stable(t) Rare(t+1) Near"]][[1]][[x]] <- mean(NF_loc_meanNB[["Stable(t) Rare(t+1) Near"]][[1]][[x]], na.rm = T)
+  NF_loc_meanNB[["Stable(t) Rare(t+1) Near"]][[2]][[x]] <- mean(NF_loc_meanNB[["Stable(t) Rare(t+1) Near"]][[2]][[x]], na.rm = T)
+  NF_loc_meanNB[["Stable(t) Rare(t+1) Far"]][[1]][[x]] <- mean(NF_loc_meanNB[["Stable(t) Rare(t+1) Far"]][[1]][[x]], na.rm = T)
+  NF_loc_meanNB[["Stable(t) Rare(t+1) Far"]][[2]][[x]] <- mean(NF_loc_meanNB[["Stable(t) Rare(t+1) Far"]][[2]][[x]], na.rm = T)
+}
+
+sem <- function(x) {
+  sd(x, na.rm = T) / sqrt(length(x[!is.na(x[])]))
+}
+
+near_SEM_loc1NB <- c()
+near_SEM_loc2NB <- c()
+far_SEM_loc1NB <- c()
+far_SEM_loc2NB <- c()
+
+for (x in 1:34){
+  near_SEM_loc1NB[x] <- c(sd(performance_cost_listNB_loc[[1]][[1]][[x]], na.rm =T) /        sqrt(length(performance_cost_listNB_loc[!is.na(performance_cost_listNB_loc[[1]][[1]][[x]])])))
+  
+  near_SEM_loc2NB[x] <- c(sd(performance_cost_listNB_loc[[1]][[2]][[x]], na.rm =T) /        sqrt(length(performance_cost_listNB_loc[!is.na(performance_cost_listNB_loc[[1]][[2]][[x]])])))
+                
+  far_SEM_loc1NB[x] <- c(sd(performance_cost_listNB_loc[[2]][[1]][[x]], na.rm =T) /        sqrt(length(performance_cost_listNB_loc[!is.na(performance_cost_listNB_loc[[2]][[1]][[x]])])))
+  
+  far_SEM_loc2NB[x] <- c(sd(performance_cost_listNB_loc[[2]][[2]][[x]], na.rm =T) /        sqrt(length(performance_cost_listNB_loc[!is.na(performance_cost_listNB_loc[[2]][[2]][[x]])])))
+}
+```
+
+```{r}
+#data frame with everything
+overall_loc_df <- data.frame("Distance" = c(rep("Near Loc 1",34),
+                                            rep("Far Loc 1",34),
+                                        rep("Near Loc 2",34),
+                                        rep("Far Loc 2",34)),
+                   "Means" = as.double(c(NF_loc_mean[[1]][[1]],
+                                         NF_loc_mean[[2]][[1]],
+                                         NF_loc_mean[[1]][[2]],
+                                       NF_loc_mean[[2]][[2]])),
+                   "SEMs" = c(near_SEM_loc1, 
+                              far_SEM_loc1,
+                              near_SEM_loc2, 
+                              far_SEM_loc2),
+                   "NB Means" = as.double(c(NF_loc_meanNB[[1]][[1]],
+                                            NF_loc_meanNB[[2]][[1]],
+                                            NF_loc_meanNB[[1]][[2]],
+                                            NF_loc_meanNB[[2]][[2]])),
+                   "NB SEMs" = c(near_SEM_loc1NB, 
+                                 far_SEM_loc1NB,
+                              near_SEM_loc2NB, 
+                              far_SEM_loc2NB)
+                   )
+```
+
+```{r}
+t.test(x = as.numeric(NF_loc_mean[[1]][[1]]),
+       y = as.numeric(NF_loc_mean[[2]][[1]]), 
+       alternative = "less",
+       paired = TRUE,
+       var.equal = T)
+```
+
+```{r}
+t.test(x = as.numeric(NF_loc_mean[[1]][[2]]),
+       y = as.numeric(NF_loc_mean[[2]][[2]]), 
+       alternative = "less",
+       paired = TRUE,
+       var.equal = T)
+```
+
+```{r}
+anovaDF <- data.frame(
+                      "Near Loc 1" = as.numeric(overall_loc_df[1:34,2]),
+                     "Near Loc 2" = as.numeric(overall_loc_df[35:68,2]),
+                     "Far Loc 1" = as.numeric(overall_loc_df[69:102,2]),
+                     "Far Loc 2" = as.numeric(overall_loc_df[103:136,2]),
+                     "Near Rare" = as.numeric(overall_df[1:34,2]),
+                     "Far Rare" = as.numeric(overall_df[35:68,2]),
+                     "Near Common" = as.numeric(overall_df_C[1:34,2]),
+                     "Far Common" = as.numeric(overall_df_C[35:68,2]))
+summary(aov(Near.Loc.1 ~ ., data = anovaDF))
+```
+
+PLOTTING
+```{r}
+library(ggpubr)
+ggbarplot(overall_loc_df, x = "Distance", y = "NB.Means",
+          xlab = "Distance Since Last Seen Loc",
+          ylab = "Reation Time (s)",
+          title = "Near vs Far Stage 2 RT Locs",
+          color = "Black",
+          fill = "Distance",
+          palette = "jco",
+          size = .5,
+          width = .5,
+          add = c("mean_se"),
+          add.params = list(size = .5),
+          error.plot = c("errorbar")
+          ) +
+  geom_point(shape = 4, size = 2) +
+  guides(fill = F)  + 
+  #geom_errorbar(aes(ymin = NB.Means - NB.SEMs, ymax = NB.Means + NB.SEMs), width = .05, position = "identity") +
+ annotate("text", x = 1, y = .9, label = "***", size = 6) + 
+  annotate("text", x = 3, y = .9, label = "***", size = 6)
+  
+```

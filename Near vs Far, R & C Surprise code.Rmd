@@ -1,0 +1,772 @@
+---
+title: "Reaction Time Descriptive Analysis"
+author: "Ian McCarthy"
+date: "2024-01-12"
+output: html_document
+---
+
+Done 1. S01 (0316, March 16th), S17, S18: These are the participants with only one fMRI data (fMRI1) recorded. Due to either problem with machine or behavior
+
+Done 2. S09: The fMRI2 (day 2) of this participant is in S01 (0508, May 8th). This is because the same schedule for S01 is being used for S09 during the second day of fMRI data collection.
+
+Done 3. S24: The data collected for this participant is not valid, and we would like to ignore the data collected.
+
+Done other than missing template on s45 4. S05,S45: Cannot use only r3 to acces the fMRI (fMRI1 for S05 and fMRI2 for S45) data for these particpants, since there were some problems with the running program. Solution is to access combine valid data in r1,r2,r3 together.
+
+Done 5. For all other participants. we can use only the r3 data file to access interested part of data.
+
+
+
+Installing necessary packages and conversions
+
+```{r}
+
+library(tidyverse)
+library(R.matlab)
+library(matlib)
+library(readr)
+
+```
+
+Big loops to get all data into their respective sessions and altering any errors
+When running, make sure fmri1 has 34, 2 has 31, training has 34. Sometimes it messes up with the subject 9 stuff
+
+```{r}
+
+
+#fmri1 data
+mat.fMRI1 <- list.files(path = "/Users/ianro/Documents/CA2Step 2024", 
+                        pattern = "CA2step_S\\d+_fMRI1_r3_\\d+-\\d+.mat$", 
+                        full.names = TRUE)
+
+#fmri2 data
+mat.fMRI2 <- list.files(path = "/Users/ianro/Documents/CA2Step 2024", 
+                        pattern = "CA2step_S\\d+_fMRI2_r3_\\d+-\\d+.mat$", 
+                        full.names = TRUE)
+
+#training data - creates duplicates? figure out
+mat.training <- list.files(path = "/Users/ianro/Documents/CA2Step 2024", 
+                        pattern = "CA2step_S\\d+_training_r3_\\d+-\\d+.mat$", 
+                        full.names = TRUE)
+
+#S05_fmri1_r1 and s45_fmri2_r1
+mat.errors <- list.files(path = "/Users/ianro/Documents/CA2Step 2024", 
+                        pattern = "CA2step_S05_fMRI1_r1_\\d+-\\d+.mat$|CA2step_S45_fMRI2_r1_\\d+-\\d+.mat$|CA2step_S45_fMRI2_r2_\\d+-\\d+.mat$", 
+                        full.names = TRUE)
+
+##fmri1 loop
+
+for (x in mat.fMRI1) {
+  
+  #creates file name matching the matlab file name without .mat
+  file_name <- tools::file_path_sans_ext(basename(x))
+  
+  #convert data into r
+  mat_data <- readMat(x)
+  
+  #assigns the file name to each individual participant in the list
+  assign(file_name, mat_data)
+  
+  #create list of data
+  
+    env <- ls() #current environment
+    fmri1_participants <- c(env[grep(pattern = "CA2step_S\\d+_fMRI1_r3_\\d+-\\d+$|CA2step_S09_fMRI2_r3_20230505-1347", ls())]) #take the participants matching pattern in env
+    fmri1_list <- list() #empty list for loop
+  
+    #for everyone in the fmri1 participants, put them in a list
+    for (i in fmri1_participants){
+    
+     fmri1_list[[i]] <- get(i)
+    
+      }
+  
+  #confirmation message
+  cat("Converted and stored", x, "as", file_name, "in R environment. \n")
+
+}
+
+fmri1_list <- fmri1_list[-19] #get rid of s24
+fmri1_list <- fmri1_list[-2]  #get rid of s01_0508 since that's actually S09_fmri2
+
+
+#adding in missing data
+s05_fmri1_r1 <- readMat(mat.errors[1])
+
+fmri1_list[["CA2step_S05_fMRI1_r3_20221028-1516"]][["data"]][[3]] <- s05_fmri1_r1[["data"]][[3]]
+fmri1_list[["CA2step_S05_fMRI1_r3_20221028-1516"]][["data"]][[4]] <- s05_fmri1_r1[["data"]][[4]]
+fmri1_list[["CA2step_S05_fMRI1_r3_20221028-1516"]][["data"]][[5]] <- s05_fmri1_r1[["data"]][[5]]
+fmri1_list[["CA2step_S05_fMRI1_r3_20221028-1516"]][["data"]][[6]] <- s05_fmri1_r1[["data"]][[6]]
+
+
+
+##fmri2 loop
+
+for (x in mat.fMRI2) {
+  
+  #creates file name matching the matlab file name without .mat
+  file_name <- tools::file_path_sans_ext(basename(x))
+  
+  #convert data into r
+  mat_data <- readMat(x)
+  
+  #assigns the file name to each individual participant in the list
+  assign(file_name, mat_data)
+  
+  #create list of data
+  
+    env <- ls() #current environment
+    fmri2_participants <- c(env[grep(pattern = "CA2step_S\\d+_fMRI2_r3_\\d+-\\d+$|CA2step_S01_fMRI1_r3_20230508-1206",
+                            ls())]) #take the participants matching pattern in env
+    fmri2_list <- list() #empty list for loop
+  
+    #for everyone in the fmri1 participants, put them in a list
+    for (i in fmri2_participants){
+    
+     fmri2_list[[i]] <- get(i)
+    
+      }
+  
+  #confirmation message
+  cat("Converted and stored", x, "as", file_name, "in R environment. \n")
+
+}
+
+#take out current S09 (0505) since it's the wrong one
+fmri2_list <- fmri2_list[-9]
+
+#adding in missing data
+
+s45_fmri2_r1 <- readMat(mat.errors[2])
+s45_fmri2_r2 <- readMat(mat.errors[3])
+
+fmri2_list[["CA2step_S45_fMRI2_r3_20230427-1717"]][["data"]][[1]] <- s45_fmri2_r1[["data"]][[1]]
+fmri2_list[["CA2step_S45_fMRI2_r3_20230427-1717"]][["data"]][[2]] <- s45_fmri2_r1[["data"]][[2]]
+fmri2_list[["CA2step_S45_fMRI2_r3_20230427-1717"]][["data"]][[3]] <- s45_fmri2_r1[["data"]][[3]]
+fmri2_list[["CA2step_S45_fMRI2_r3_20230427-1717"]][["data"]][[4]] <- s45_fmri2_r1[["data"]][[4]]
+fmri2_list[["CA2step_S45_fMRI2_r3_20230427-1717"]][["data"]][[5]] <- s45_fmri2_r1[["data"]][[5]]
+fmri2_list[["CA2step_S45_fMRI2_r3_20230427-1717"]][["data"]][[6]] <- s45_fmri2_r1[["data"]][[6]]
+fmri2_list[["CA2step_S45_fMRI2_r3_20230427-1717"]][["data"]][[12]] #template is missing, take it from the template (check date)
+
+
+##training loop
+
+for (x in mat.training) {
+  
+  #creates file name matching the matlab file name without .mat
+  file_name <- tools::file_path_sans_ext(basename(x))
+  
+  #convert data into r
+  mat_data <- readMat(x)
+  
+  #assigns the file name to each individual participant in the list
+  assign(file_name, mat_data)
+  
+  #create list of data
+  
+  env <- ls() #current environment
+  training_participants <- env[grep(pattern = "CA2step_S\\d+_training_r3_\\d+-\\d+$", ls())] #take the participants matching pattern in env
+  training_list <- list() #empty list for loop
+  
+  #for everyone in the fmri1 participants, put them in a list
+  for (i in training_participants){
+    
+    training_list[[i]] <- get(i)
+    
+  }
+  
+  #taking out all duplicates and bad ones
+  
+  training_error <- c(-45, -43, -40, -37, -36, -28, -27, -25, -23, -22, -19, -18, -2, -3, -4, -7, -23, -31)
+  
+  for (z in training_error) {
+    
+    training_list <- training_list[z]
+  }
+  
+  #confirmation message
+  cat("Converted and stored", x, "as", file_name, "in R environment. \n")
+  
+}
+```
+    
+Getting together transitions, reallocations, and reaction times
+```{r}
+#creating vectors of the transitions and reallocation to identify trial type
+training_transitions <- all_data[["training"]][["CA2step_S01_training_r3_20221021-1222"]][["expe"]][[1]][[5]]
+training_reallocations <- all_data[["training"]][["CA2step_S01_training_r3_20221021-1222"]][["expe"]][[1]][[6]]
+fmri1_transitions <- `CA2step_S01_fMRI1_r3_20230316-1704`[["expe"]][[1]][[5]]
+fmri1_reallocataions <- `CA2step_S01_fMRI1_r3_20230316-1704`[["expe"]][[1]][[6]]
+fmri2_transitions <- `CA2step_S02_fMRI2_r3_20230509-1300`[["expe"]][[1]][[5]]
+fmri2_reallocataions <- `CA2step_S02_fMRI2_r3_20230509-1300`[["expe"]][[1]][[6]]
+
+#creating list of empty vectors for the loops
+fmri1_stage1_rt <- vector(mode = "list", length = 34)
+fmri2_stage1_rt <- vector(mode = "list", length = 34)
+training_stage1_rt <- vector(mode = "list", length = 34)
+
+fmri1_stage2_rt <- vector(mode = "list", length = 34)
+fmri2_stage2_rt <- vector(mode = "list", length = 34)
+training_stage2_rt <- vector(mode = "list", length = 34)
+
+#assigning reaction times to their 
+for (x in 1:length(fmri1_list)){
+  
+  fmri1_stage1_rt[[x]] <- c(fmri1_list[[x]][["data"]][[5]][[4]],
+                            fmri1_list[[x]][["data"]][[11]][[4]], 
+                            fmri1_list[[x]][["data"]][[17]][[4]])
+  
+  fmri1_stage2_rt[[x]] <- c(fmri1_list[[x]][["data"]][[6]][[4]],
+                            fmri1_list[[x]][["data"]][[12]][[4]], 
+                            fmri1_list[[x]][["data"]][[18]][[4]])
+  
+  training_stage1_rt[[x]] <- c(training_list[[x]][["data"]][[3]][[4]], 
+                               training_list[[x]][["data"]][[7]][[4]], 
+                               training_list[[x]][["data"]][[11]][[4]])
+  
+  training_stage2_rt[[x]] <- c(training_list[[x]][["data"]][[4]][[4]], 
+                               training_list[[x]][["data"]][[8]][[4]], 
+                               training_list[[x]][["data"]][[12]][[4]])
+  
+}
+#fixing the 120 vector in trianing30
+training_stage1_fix <- c(rep(NaN,60), training_stage1_rt[[30]])
+training_stage2_fix <- c(rep(NaN,60), training_stage2_rt[[30]])
+training_stage1_rt[[30]] <- training_stage1_fix
+training_stage2_rt[[30]] <- training_stage2_fix
+
+
+fmri2_rt_indices <- c(2:8,10:13,16:34) #those with good data
+fmri2_list_indices <- c(2:31)
+
+#those with missing data
+fmri2_stage1_rt[[1]] <- rep(NaN, 180) 
+fmri2_stage2_rt[[1]] <- rep(NaN, 180)
+fmri2_stage1_rt[[14]] <- rep(NaN, 180) 
+fmri2_stage2_rt[[14]] <- rep(NaN, 180)
+fmri2_stage1_rt[[15]] <- rep(NaN, 180) 
+fmri2_stage2_rt[[15]] <- rep(NaN, 180)
+
+#since s09 is stored as s01
+fmri2_stage1_rt[[9]] <- c(fmri2_list[[1]][["data"]][[5]][[4]],
+                            fmri2_list[[1]][["data"]][[11]][[4]], 
+                            fmri2_list[[1]][["data"]][[17]][[4]])
+fmri2_stage2_rt[[9]] <- c(fmri2_list[[1]][["data"]][[6]][[4]],
+                            fmri2_list[[1]][["data"]][[12]][[4]], 
+                            fmri2_list[[1]][["data"]][[18]][[4]])
+
+for (i in fmri2_list_indices){
+  for (x in fmri2_rt_indices){
+  
+  fmri2_stage1_rt[[x]] <- c(fmri2_list[[i]][["data"]][[5]][[4]],
+                            fmri2_list[[i]][["data"]][[11]][[4]], 
+                            fmri2_list[[i]][["data"]][[17]][[4]])
+  
+  fmri2_stage2_rt[[x]] <- c(fmri2_list[[i]][["data"]][[6]][[4]],
+                            fmri2_list[[i]][["data"]][[12]][[4]], 
+                            fmri2_list[[i]][["data"]][[18]][[4]])
+
+  }
+}
+
+#these participants' data stored differently, so indexing separately
+fmri2_stage1_rt[[32]] <- c(fmri2_list[["CA2step_S45_fMRI2_r3_20230427-1717"]][["data"]][[5]][[4]],
+                                fmri2_list[["CA2step_S45_fMRI2_r3_20230427-1717"]][["data"]][[10]][[4]],
+                                fmri2_list[["CA2step_S45_fMRI2_r3_20230427-1717"]][["data"]][[16]][[4]])
+fmri2_stage2_rt[[32]] <- c(fmri2_list[["CA2step_S45_fMRI2_r3_20230427-1717"]][["data"]][[6]][[4]],
+                                fmri2_list[["CA2step_S45_fMRI2_r3_20230427-1717"]][["data"]][[11]][[4]],
+                                fmri2_list[["CA2step_S45_fMRI2_r3_20230427-1717"]][["data"]][[17]][[4]])
+
+RT <- list("Stage 1" = list(fmri1_stage1_rt, fmri2_stage1_rt, training_stage1_rt),
+           "Stage 2" = list(fmri1_stage2_rt, fmri2_stage2_rt, training_stage2_rt))
+
+RT_no_session <- list("Stage 1" = vector(mode = "list", length = 34),
+                      "Stage 2" = vector(mode = "list", length = 34))
+
+for (x in 1:34){
+    RT_no_session[["Stage 2"]][[x]] <- c(RT[["Stage 2"]][[1]][[x]], 
+                                         RT[["Stage 2"]][[2]][[x]], 
+                                         RT[["Stage 2"]][[3]][[x]])
+    
+    RT_no_session[["Stage 1"]][[x]] <- c(RT[["Stage 1"]][[1]][[x]],
+                                         RT[["Stage 1"]][[2]][[x]],
+                                         RT[["Stage 1"]][[3]][[x]])
+}
+```
+
+Baselining and reaplacing outliers
+```{r}
+#replacing outliers
+replace_outliers <- function(x) {
+  q <- quantile(x, c(0.25, 0.75), na.rm = T)
+  iqr <- IQR(x, na.rm = T)
+  lower_bound <- q[1] - 1.5 * iqr
+  upper_bound <- q[2] + 1.5 * iqr
+  x_outliers_replaced <- x
+  x_outliers_replaced[x < lower_bound | x > upper_bound] <- NaN
+  return(x_outliers_replaced)
+}
+
+stage2_RT_no_session <- RT_no_session[["Stage 2"]]
+
+no_outlier <- lapply(stage2_RT_no_session, replace_outliers)
+
+#baselining fuction
+baseline_function <- function(x,y){
+  x - mean(y, na.rm = T)
+}
+
+#baseline now yes
+prepped_stage2_rt <- no_outlier
+outlier_stage2_rt <- stage2_RT_no_session
+
+for (x in 1:34){
+  prepped_stage2_rt[[x]] <- baseline_function(prepped_stage2_rt[[x]], prepped_stage2_rt[[x]])
+  outlier_stage2_rt[[x]] <- baseline_function(stage2_RT_no_session[[x]],stage2_RT_no_session[[x]])
+}
+```
+
+Outliers kept in
+```{r}
+performance_cost_list <- list("Stable(t) Rare(t+1) Near" =
+                                vector(mode = "list", length = 34), 
+                              "Stable(t) Rare(t+1) Far" = 
+                                vector(mode = "list", length = 34)
+                                )
+
+
+transitions <- c(fmri1_transitions,fmri2_transitions,training_transitions)
+reallocations <- c(fmri1_reallocataions,fmri2_reallocataions,training_reallocations)
+all_trials <- c(3:179,183:359, 363:539)
+ 
+
+for (i in 1:34) {
+    for (x in all_trials) { 
+  #t-2,t-1, or t is rare stable
+  if (transitions[x-2] == 1 && reallocations[x-2] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x-1] == 1 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x] == 1 && reallocations[x] == 0){
+    #if t+1 is rare
+    if (transitions[x+1] == 1) {
+      #it is near, so combine the ones that match with that with the specific RTs
+        performance_cost_list[[1]][[i]] <- c(performance_cost_list[[1]][[i]], 
+                                             outlier_stage2_rt[[i]][[x+1]]) #was previously prepped_stage2_rt
+      }
+    }
+  else 
+    if (transitions[x-2] == 0 && reallocations[x-2] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0|
+      transitions[x-1] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x] == 0 && reallocations[x] == 0)
+    {
+    if (transitions[x+1] == 1) {
+      #it is far, so combine the ones that match with that with the specific RTs
+      performance_cost_list[[2]][[i]] <- c(performance_cost_list[[2]][[i]], 
+                                                outlier_stage2_rt[[i]][[x+1]])
+        }
+      }
+    }
+}
+  
+
+#the same but for non-basedlined for easier plotting
+
+performance_cost_listNB <- list("Stable(t) Rare(t+1) Near" =
+                                vector(mode = "list", length = 34), 
+                              "Stable(t) Rare(t+1) Far" = 
+                                vector(mode = "list", length = 34)
+                                )
+
+for (i in 1:34) {
+    for (x in all_trials) { 
+  #t-2,t-1, or t is rare stable
+  if (transitions[x-2] == 1 && reallocations[x-2] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x-1] == 1 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x] == 1 && reallocations[x] == 0){
+    #if t+1 is rare
+    if (transitions[x+1] == 1) {
+      #it is near, so combine the ones that match with that with the specific RTs
+        performance_cost_listNB[[1]][[i]] <- c(performance_cost_listNB[[1]][[i]], 
+                                             stage2_RT_no_session[[i]][[x+1]]) #was previously no_outlier
+      }
+    }
+  else 
+    if (transitions[x-2] == 0 && reallocations[x-2] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0|
+      transitions[x-1] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x] == 0 && reallocations[x] == 0)
+    {
+    if (transitions[x+1] == 1) {
+      #it is far, so combine the ones that match with that with the specific RTs
+      performance_cost_listNB[[2]][[i]] <- c(performance_cost_listNB[[2]][[i]], 
+                                                stage2_RT_no_session[[i]][[x+1]])
+        }
+      }
+    }
+  }
+```
+
+Outliers taken out
+```{r}
+performance_cost_list_NO <- list("Stable(t) Rare(t+1) Near" =
+                                vector(mode = "list", length = 34), 
+                              "Stable(t) Rare(t+1) Far" = 
+                                vector(mode = "list", length = 34)
+                                )
+
+
+transitions <- c(fmri1_transitions,fmri2_transitions,training_transitions)
+reallocations <- c(fmri1_reallocataions,fmri2_reallocataions,training_reallocations)
+all_trials <- c(3:179,183:359, 363:539)
+ 
+
+for (i in 1:34) {
+    for (x in all_trials) { 
+  #t-2,t-1, or t is rare stable
+  if (transitions[x-2] == 1 && reallocations[x-2] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x-1] == 1 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x] == 1 && reallocations[x] == 0){
+    #if t+1 is rare
+    if (transitions[x+1] == 1) {
+      #it is near, so combine the ones that match with that with the specific RTs
+        performance_cost_list_NO[[1]][[i]] <- c(performance_cost_list_NO[[1]][[i]], 
+                                             prepped_stage2_rt[[i]][[x+1]]) 
+      }
+    }
+  else 
+    if (transitions[x-2] == 0 && reallocations[x-2] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0|
+      transitions[x-1] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x] == 0 && reallocations[x] == 0)
+    {
+    if (transitions[x+1] == 1) {
+      #it is far, so combine the ones that match with that with the specific RTs
+      performance_cost_list_NO[[2]][[i]] <- c(performance_cost_list_NO[[2]][[i]], 
+                                                prepped_stage2_rt[[i]][[x+1]])
+        }
+      }
+    }
+}
+  
+
+#the same but for non-basedlined for easier plotting
+
+performance_cost_listNB_NO <- list("Stable(t) Rare(t+1) Near" =
+                                vector(mode = "list", length = 34), 
+                              "Stable(t) Rare(t+1) Far" = 
+                                vector(mode = "list", length = 34)
+                                )
+
+for (i in 1:34) {
+    for (x in all_trials) { 
+  #t-2,t-1, or t is rare stable
+  if (transitions[x-2] == 1 && reallocations[x-2] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x-1] == 1 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x] == 1 && reallocations[x] == 0){
+    #if t+1 is rare
+    if (transitions[x+1] == 1) {
+      #it is near, so combine the ones that match with that with the specific RTs
+        performance_cost_listNB_NO[[1]][[i]] <- c(performance_cost_listNB_NO[[1]][[i]], 
+                                             no_outlier[[i]][[x+1]])
+      }
+    }
+  else 
+    if (transitions[x-2] == 0 && reallocations[x-2] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0|
+      transitions[x-1] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x] == 0 && reallocations[x] == 0)
+    {
+    if (transitions[x+1] == 1) {
+      #it is far, so combine the ones that match with that with the specific RTs
+      performance_cost_listNB_NO[[2]][[i]] <- c(performance_cost_listNB_NO[[2]][[i]], 
+                                                no_outlier[[i]][[x+1]])
+        }
+      }
+    }
+  }
+```
+
+Means and sem 
+```{r}
+NF_mean_NO <- performance_cost_list_NO
+NF_mean <- performance_cost_list
+         
+for (x in 1:34){
+  NF_mean_NO[["Stable(t) Rare(t+1) Near"]][[x]] <- mean(NF_mean_NO[["Stable(t) Rare(t+1) Near"]][[x]], na.rm = T)
+  NF_mean_NO[["Stable(t) Rare(t+1) Far"]][[x]] <- mean(NF_mean_NO[["Stable(t) Rare(t+1) Far"]][[x]], na.rm = T)
+  NF_mean[["Stable(t) Rare(t+1) Near"]][[x]] <- mean(NF_mean[["Stable(t) Rare(t+1) Near"]][[x]], na.rm = T)
+  NF_mean[["Stable(t) Rare(t+1) Far"]][[x]] <- mean(NF_mean[["Stable(t) Rare(t+1) Far"]][[x]], na.rm = T)
+}
+
+sem <- function(x) {
+  sd(x, na.rm = T) / sqrt(length(x[!is.na(x[])]))
+}
+
+near_SEM_NO <- c()
+far_SEM_NO <- c()
+near_SEM <- c()
+far_SEM <- c()
+
+for (x in 1:34){
+  near_SEM_NO[x] <- c(sd(performance_cost_list_NO[[1]][[x]], na.rm =T) /        sqrt(length(performance_cost_list_NO[!is.na(performance_cost_list_NO[[1]][[x]])])))
+                
+  far_SEM_NO[x] <- c(sd(performance_cost_list_NO[[2]][[x]], na.rm =T) /        sqrt(length(performance_cost_list_NO[!is.na(performance_cost_list_NO[[2]][[x]])])))
+  
+    near_SEM[x] <- c(sd(performance_cost_list[[1]][[x]], na.rm =T) /        sqrt(length(performance_cost_list[!is.na(performance_cost_list[[1]][[x]])])))
+                
+  far_SEM[x] <- c(sd(performance_cost_list[[2]][[x]], na.rm =T) /        sqrt(length(performance_cost_list[!is.na(performance_cost_list[[2]][[x]])])))
+}
+
+#for NB
+NF_meanNB_NO <- performance_cost_listNB_NO
+NF_meanNB <- performance_cost_listNB
+         
+for (x in 1:34){
+  NF_meanNB_NO[["Stable(t) Rare(t+1) Near"]][[x]] <- mean(NF_meanNB_NO[["Stable(t) Rare(t+1) Near"]][[x]], na.rm = T)
+  NF_meanNB_NO[["Stable(t) Rare(t+1) Far"]][[x]] <- mean(NF_meanNB_NO[["Stable(t) Rare(t+1) Far"]][[x]], na.rm = T)
+    NF_meanNB[["Stable(t) Rare(t+1) Near"]][[x]] <- mean(NF_meanNB[["Stable(t) Rare(t+1) Near"]][[x]], na.rm = T)
+  NF_meanNB[["Stable(t) Rare(t+1) Far"]][[x]] <- mean(NF_meanNB[["Stable(t) Rare(t+1) Far"]][[x]], na.rm = T)
+}
+
+sem <- function(x) {
+  sd(x, na.rm = T) / sqrt(length(x[!is.na(x[])]))
+}
+
+near_SEM_NB_NO <- c()
+far_SEM_NB_NO <- c()
+near_SEM_NB <- c()
+far_SEM_NB <- c()
+
+for (x in 1:34){
+  near_SEM_NB_NO[x] <- c(sd(performance_cost_listNB_NO[[1]][[x]], na.rm =T) /        sqrt(length(performance_cost_listNB_NO[!is.na(performance_cost_listNB_NO[[1]][[x]])])))
+                
+  far_SEM_NB_NO[x] <- c(sd(performance_cost_listNB_NO[[2]][[x]], na.rm =T) /        sqrt(length(performance_cost_listNB_NO[!is.na(performance_cost_listNB_NO[[2]][[x]])])))
+  
+  near_SEM_NB[x] <- c(sd(performance_cost_listNB[[1]][[x]], na.rm =T) /        sqrt(length(performance_cost_listNB[!is.na(performance_cost_listNB[[1]][[x]])])))
+                
+  far_SEM_NB[x] <- c(sd(performance_cost_listNB[[2]][[x]], na.rm =T) /        sqrt(length(performance_cost_listNB[!is.na(performance_cost_listNB[[2]][[x]])])))
+}
+```
+
+```{r}
+#data frame with everything
+overall_df_NO <- data.frame("Distance" = c(rep("Near",34),rep("Far",34)),
+                   "Means" = as.double(c(NF_mean_NO[[1]],NF_mean_NO[[2]])),
+                   "SEMs" = c(near_SEM_NO, far_SEM_NO),
+                   "NB Means" = as.double(c(NF_meanNB_NO[[1]], NF_meanNB_NO[[2]])),
+                   "NB SEMs" = c(near_SEM_NB_NO, far_SEM_NB_NO)
+                   )
+
+overall_df <- data.frame("Distance" = c(rep("Near",34),rep("Far",34)),
+                   "Means" = as.double(c(NF_mean[[1]],NF_mean[[2]])),
+                   "SEMs" = c(near_SEM, far_SEM),
+                   "NB Means" = as.double(c(NF_meanNB[[1]], NF_meanNB[[2]])),
+                   "NB SEMs" = c(near_SEM_NB, far_SEM_NB)
+                   )
+```
+
+
+
+t test 
+```{r}
+#no outlier
+t.test(x = as.numeric(overall_df_NO[1:34,2]),
+       y = as.numeric(overall_df_NO[35:68,2]), 
+       alternative = "less",
+       paired = TRUE,
+       var.equal = T)
+
+#with outlier
+t.test(x = as.numeric(overall_df[1:34,2]),
+       y = as.numeric(overall_df[35:68,2]), 
+       alternative = "less",
+       paired = TRUE,
+       var.equal = T)
+```
+
+plotting
+```{r}
+library(ggpubr)
+ggbarplot(overall_df_NO, x = "Distance", y = "NB.Means",
+          xlab = "Distance Since Last Rare Transition",
+          ylab = "Reation Time (s)",
+          title = "Near vs Far Stage 2 RT Following a Rare Transition, No Outliers",
+          color = "Black",
+          fill = "Distance",
+          palette = "jco",
+          size = .5,
+          width = .5,
+          add = c("mean_se"),
+          add.params = list(size = .5),
+          error.plot = c("errorbar")
+          ) +
+  geom_point(shape = 4, size = 2) +
+  guides(fill = F)  + 
+  geom_errorbar(aes(ymin = NB.Means - NB.SEMs, ymax = NB.Means + NB.SEMs), width = .05, position = "identity")
+  
+
+ggbarplot(overall_df, x = "Distance", y = "NB.Means",
+          xlab = "Distance Since Last Rare Transition",
+          ylab = "Reation Time (s)",
+          title = "Near vs Far Stage 2 RT Following a Rare Transition, With Outliers",
+          color = "Black",
+          fill = "Distance",
+          palette = "jco",
+          size = .5,
+          width = .5,
+          add = c("mean_se"),
+          add.params = list(size = .5),
+          error.plot = c("errorbar")
+          ) +
+  geom_point(shape = 4, size = 2) +
+  guides(fill = F)  + 
+  geom_errorbar(aes(ymin = NB.Means - NB.SEMs, ymax = NB.Means + NB.SEMs), width = .05, position = "identity") +
+  annotate("text", x = 1, y = .9, label = "***", size = 6)
+  
+```
+
+
+## NOW WITH COMMON ON t+1 INSTEAD OF RARE
+
+```{r}
+#assigning RT to proper indices
+performance_cost_list_C <- list("Stable(t) Rare(t+1) Near" =
+                                vector(mode = "list", length = 34), 
+                              "Stable(t) Rare(t+1) Far" = 
+                                vector(mode = "list", length = 34)
+                                )
+
+for (i in 1:34) {
+    for (x in all_trials) { 
+  #t-2,t-1, or t is rare stable
+  if (transitions[x-2] == 1 && reallocations[x-2] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x-1] == 1 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x] == 1 && reallocations[x] == 0){
+    #if t+1 is common
+    if (transitions[x+1] == 0) {
+      #it is near, so combine the ones that match with that with the specific RTs
+        performance_cost_list_C[[1]][[i]] <- c(performance_cost_list_C[[1]][[i]], 
+                                             prepped_stage2_rt[[i]][[x+1]])
+      }
+    }
+  else 
+    if (transitions[x-2] == 0 && reallocations[x-2] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0|
+      transitions[x-1] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x] == 0 && reallocations[x] == 0)
+    {
+    if (transitions[x+1] == 0) {
+      #it is far, so combine the ones that match with that with the specific RTs
+      performance_cost_list_C[[2]][[i]] <- c(performance_cost_list_C[[2]][[i]], 
+                                                prepped_stage2_rt[[i]][[x+1]])
+        }
+      }
+    }
+  }
+
+#the same but for non-basedlined for easier plotting
+
+performance_cost_listNB_C <- list("Stable(t) Rare(t+1) Near" =
+                                vector(mode = "list", length = 34), 
+                              "Stable(t) Rare(t+1) Far" = 
+                                vector(mode = "list", length = 34)
+                                )
+
+for (i in 1:34) {
+    for (x in all_trials) { 
+  #t-2,t-1, or t is rare stable
+  if (transitions[x-2] == 1 && reallocations[x-2] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x-1] == 1 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x] == 1 && reallocations[x] == 0){
+    #if t+1 is rare
+    if (transitions[x+1] == 0) {
+      #it is near, so combine the ones that match with that with the specific RTs
+        performance_cost_listNB_C[[1]][[i]] <- c(performance_cost_listNB_C[[1]][[i]], 
+                                             no_outlier[[i]][[x+1]])
+      }
+    }
+  else 
+    if (transitions[x-2] == 0 && reallocations[x-2] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0|
+      transitions[x-1] == 0 && reallocations[x-1] == 0 && reallocations[x] == 0| 
+      transitions[x] == 0 && reallocations[x] == 0)
+    {
+    if (transitions[x+1] == 0) {
+      #it is far, so combine the ones that match with that with the specific RTs
+      performance_cost_listNB_C[[2]][[i]] <- c(performance_cost_listNB_C[[2]][[i]], 
+                                                no_outlier[[i]][[x+1]])
+        }
+      }
+    }
+}
+
+#taking means of the baselined
+NF_mean_C <- performance_cost_list_C
+         
+for (x in 1:34){
+  NF_mean_C[["Stable(t) Rare(t+1) Near"]][[x]] <- mean(NF_mean_C[["Stable(t) Rare(t+1) Near"]][[x]], na.rm = T)
+  NF_mean_C[["Stable(t) Rare(t+1) Far"]][[x]] <- mean(NF_mean_C[["Stable(t) Rare(t+1) Far"]][[x]], na.rm = T)
+}
+
+sem <- function(x) {
+  sd(x, na.rm = T) / sqrt(length(x[!is.na(x[])]))
+}
+
+near_SEM_C <- c()
+far_SEM_C <- c()
+
+for (x in 1:34){
+  near_SEM_C[x] <- c(sd(performance_cost_list_C[[1]][[x]], na.rm =T) /        sqrt(length(performance_cost_list_C[!is.na(performance_cost_list_C[[1]][[x]])])))
+                
+  far_SEM_C[x] <- c(sd(performance_cost_list_C[[2]][[x]], na.rm =T) /        sqrt(length(performance_cost_list_C[!is.na(performance_cost_list_C[[2]][[x]])])))
+}
+
+#takng means for NB
+NF_meanNB_C <- performance_cost_listNB_C
+         
+for (x in 1:34){
+  NF_meanNB_C[["Stable(t) Rare(t+1) Near"]][[x]] <- mean(NF_meanNB_C[["Stable(t) Rare(t+1) Near"]][[x]], na.rm = T)
+  NF_meanNB_C[["Stable(t) Rare(t+1) Far"]][[x]] <- mean(NF_meanNB_C[["Stable(t) Rare(t+1) Far"]][[x]], na.rm = T)
+}
+
+sem <- function(x) {
+  sd(x, na.rm = T) / sqrt(length(x[!is.na(x[])]))
+}
+
+near_SEM_NB_C <- c()
+far_SEM_NB_C <- c()
+
+for (x in 1:34){
+  near_SEM_NB_C[x] <- c(sd(performance_cost_listNB_C[[1]][[x]], na.rm =T) /        sqrt(length(performance_cost_listNB_C[!is.na(performance_cost_listNB_C[[1]][[x]])])))
+                
+  far_SEM_NB_C[x] <- c(sd(performance_cost_listNB[[2]][[x]], na.rm =T) /        sqrt(length(performance_cost_listNB_C[!is.na(performance_cost_listNB_C[[2]][[x]])])))
+}
+
+overall_df_C <- data.frame("Distance" = c(rep("Near",34),rep("Far",34)),
+                   "Means" = as.double(c(NF_mean_C[[1]],NF_mean_C[[2]])),
+                   "SEMs" = c(near_SEM_C, far_SEM_C),
+                   "NB Means" = as.double(c(NF_meanNB_C[[1]], NF_meanNB_C[[2]])),
+                   "NB SEMs" = c(near_SEM_NB_C, far_SEM_NB_C)
+                   )
+```
+
+t test :)
+```{r}
+t.test(x = as.numeric(overall_df_C[1:34,2]),
+       y = as.numeric(overall_df_C[35:68,2]),
+       paired = TRUE,
+       var.equal = T)
+```
+
+```{r}
+library(ggpubr)
+ggbarplot(overall_df_C, x = "Distance", y = "NB.Means",
+          xlab = "Distance Since Last Rare Transition",
+          ylab = "Reation Time (s)",
+          title = "Near vs Far Stage 2 RT Following a Common Transition",
+          color = "Black",
+          fill = "Distance",
+          palette = "jco",
+          size = .5,
+          width = .5,
+          add = c("mean_se"),
+          add.params = list(size = .5),
+          error.plot = c("errorbar")
+          ) +
+  geom_point(shape = 4, size = 2) +
+  guides(fill = F)  + 
+  geom_errorbar(aes(ymin = NB.Means - NB.SEMs, ymax = NB.Means + NB.SEMs), width = .05, position = "identity") 
+```
