@@ -1,0 +1,782 @@
+---
+title: "Final"
+author: "Ian McCarthy"
+date: "2024-03-12"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(rcompanion)
+library(MASS)
+library(huxtable)
+library(cowplot)
+library(corrplot)
+library(MPV)
+library(leaps)
+library(ppcor)
+library(car)
+library(glmnet)
+library(psych)
+library(rcompanion) #To load in the library needed
+library(dbplyr)
+wine <- read.csv("winequality-red.csv", header = T,  sep =";") #model wine quality
+```
+So in all these plots, tend to be two clusters that determine lower vs higher quality for the fitted values
+
+
+Relationships from graphs:
+- Fixed acidity: Not much change with increasing
+- volatile acidity: With increase comes decrease in quality
+- Citric acid: Not much change
+- Residual Sugar: Not much change
+- Chlorides: Not much change
+- Free Sulfur Dioxide: not much change
+- Total Sulfur Dioxide: Lower has more 8s, but seems pretty evenly distributed
+- Density: more variability, but .999 tends to produce 5-7
+- pH: pretty much the same
+- Sulphates: slight increase in quality with increase
+- Alcohol: slight increase in quality with increase
+
+
+```{r}
+wine_model <- lm(quality ~ ., data = wine)
+
+ggplot(data = wine, mapping = aes(x = wine$fixed.acidity, y = wine$quality)) +
+  geom_point() + 
+  #geom_smooth(method = "lm") + 
+  labs(title = "Quality and Fixed Acidity") + 
+  ylab("Quality") + 
+  xlab("Fixed Acidity")
+
+
+ggplot(data = wine, mapping = aes(x = wine$volatile.acidity, y = wine$quality)) +
+  geom_point() + 
+  #geom_smooth(method = "lm")+ 
+  labs(title = "Quality and Volatile Acidity") + 
+  ylab("Quality") + 
+  xlab("Volatile Acidity")
+
+ggplot(data = wine, mapping = aes(x = wine$citric.acid, y = wine$quality)) +
+  geom_point() + 
+  #geom_smooth(method = "lm")+ 
+  labs(title = "Quality and Citric Acid") + 
+  ylab("Quality") + 
+  xlab("Citric Acid")
+
+ggplot(data = wine, mapping = aes(x = wine$residual.sugar, y = wine$quality)) +
+  geom_point() + 
+  #geom_smooth(method = "lm")+ 
+  labs(title = "Quality and Residual Sugar") + 
+  ylab("Quality") + 
+  xlab("Residual Sugar")
+
+ggplot(data = wine, mapping = aes(x = wine$chlorides, y = wine$quality)) +
+  geom_point() + 
+  #geom_smooth(method = "lm")+ 
+  labs(title = "Quality and Chlorides") + 
+  ylab("Quality") + 
+  xlab("Chlorides")
+
+ggplot(data = wine, mapping = aes(x = wine$free.sulfur.dioxide, y = wine$quality)) +
+  geom_point() + 
+  #geom_smooth(method = "lm")+ 
+  labs(title = "Quality and Free Sulfur Dioxide") + 
+  ylab("Quality") + 
+  xlab("Free Sulfur Dioxide")
+
+ggplot(data = wine, mapping = aes(x = wine$total.sulfur.dioxide, y = wine$quality)) +
+  geom_point() + 
+  #geom_smooth(method = "lm")+ 
+  labs(title = "Quality and Total Sulfur Dioxide") + 
+  ylab("Quality") + 
+  xlab("Total Sulfur Dioxide")
+
+ggplot(data = wine, mapping = aes(x = wine$density, y = wine$quality)) +
+  geom_point() + 
+  #geom_smooth(method = "lm")+ 
+  labs(title = "Quality and Density") + 
+  ylab("Quality") + 
+  xlab("Density")
+
+ggplot(data = wine, mapping = aes(x = wine$pH, y = wine$quality)) +
+  geom_point() + 
+  #geom_smooth(method = "lm")+ 
+  labs(title = "Quality and pH") + 
+  ylab("Quality") + 
+  xlab("pH")
+
+ggplot(data = wine, mapping = aes(x = wine$sulphates, y = wine$quality)) +
+  geom_point() + 
+  #geom_smooth(method = "lm")+ 
+  labs(title = "Quality and Sulphates") + 
+  ylab("Quality") + 
+  xlab("Sulphates")
+
+ggplot(data = wine, mapping = aes(x = wine$alcohol, y = wine$quality)) +
+  geom_point() + 
+  #geom_smooth(method = "lm")+ 
+  labs(title = "Quality and Alcohol") + 
+  ylab("Quality") + 
+  xlab("Alcohol")
+
+hist(winex$x6, main = "Free Sulfur Dioxide Histogram", xlab = "Free Sulfur Dioxide", col = "blue")
+hist(winex$x7, main = "Total Sulfur Dioxide Histogram", xlab = "Total Sulfur Dioxide", col = "blue")
+hist(log(winex$x6), main = "Log Free Sulfur Dioxide Histogram", xlab = "Log(Free Sulfur Dioxide)", col = "orange")
+hist(log(winex$x7), main = "Log Total Sulfur Dioxide Histogram", xlab = "Log(Total Sulfur Dioxide)", col = "orange")
+```
+
+Correlations WHY NANS
+Correlations:
+- Fixed acitiy strongly negatively correlated with pH
+- Fixed acidity strongly positively correalted with citric acid and density
+- Volatile acidity and citric acid moderately negatively correlated
+- Citric acid and pH moderately negatively correlated
+- Alcohol and density moderately negatively correlated
+```{r}
+datamatrix <- cor(wine[,1:11])
+corrplot(datamatrix,method = "number")
+pcor(datamatrix,method = "pearson")$p.value
+```
+
+Testing assumptions - neither normality nor heterscedasticity is met
+```{r}
+qqnorm(wine_model$residuals)
+shapiro.test(wine_model$residuals)
+
+Group = rep("Lower",nrow(wine)) #Creates a vector that repeats "Lower" n times
+Group[wine$quality > median(wine$quality)] = "Upper" #Changing the appropriate values to "Upper"
+Group = as.factor(Group) #Changes it to a factor, which R recognizes as a grouping variable.
+wine$Group = Group
+the.FKtest= fligner.test(wine_model$residuals, wine$Group)
+the.FKtest
+
+```
+
+Trying a box cox - normality is bad but heteroscedasticity is good
+```{r}
+BC = boxcox(wine_model,lambda = seq(-6,6,0.1),plotit = FALSE)
+lambda = BC$x[which.max(BC$y)]
+lambda
+BC.Y = (wine$quality^lambda - 1)/lambda
+BC.data = data.frame(Y = BC.Y)
+BC.data[,2:12] <- wine[,1:11]
+# created a new data set with my new Y and my original X1
+par(mfrow = c(1,2))
+BC.model = lm(Y ~ ., data = BC.data)
+plot(BC.model$residuals)
+qqnorm(BC.model$residuals)
+qqline(BC.model$residuals)
+
+
+Group = rep("Lower",nrow(wine)) #Creates a vector that repeats "Lower" n times
+Group[BC.data$Y > median(BC.data$Y)] = "Upper" #Changing the appropriate values to "Upper"
+Group = as.factor(Group) #Changes it to a factor, which R recognizes as a grouping variable.
+BC.data$Group = Group
+
+fligner.test(BC.model$residuals, BC.data$Group)
+shapiro.test(BC.model$residuals)
+plot(BC.model$fitted.values,BC.model$residuals)
+```
+
+Trying some model selection stuff - FB BIC - didn't pass assumptions
+```{r}
+winex <- wine
+winex <- winex[,-13]
+colnames(winex) <- c("x1","x2","x3","x4","x5","x6","x7","x8","x9","x10","x11","y")
+formulas = map(1:11, ~ combn(paste0("x",1:11), .x) %>% 
+      apply(., 2, function(v) paste0("y ~ ", paste(v, collapse=" + ")))) %>% 
+  unlist
+
+FB.model.BIC = stepAIC(empty_model,  scope = list(lower = empty_model, upper= full_model), k = log(nrow(winex)),trace=FALSE,direction = "both")
+FB.model.BIC
+
+shapiro.test(FB.model.BIC$residuals)
+fligner.test(FB.model.BIC$residuals, wine$Group)
+plot(FB.model.BIC$fitted.values, FB.model.BIC$residuals)
+```
+
+Removing outliers for FB model
+```{r}
+ei.s = FB.model.BIC$residuals/sqrt(sum(FB.model.BIC$residuals^2)/(nrow(winex) - length(FB.model.BIC$coefficients)))
+ri = rstandard(FB.model.BIC)
+ti = rstudent(FB.model.BIC)
+
+alpha = 0.1 ; n = nrow(winex); p = length(FB.model.BIC$coefficients)
+cutoff = qt(1-alpha/(2*n), n -p )
+cutoff.deleted = qt(1-alpha/(2*n), n -p -1 )
+
+outliers = which(abs(ei.s)> cutoff | abs(ri) > cutoff | abs(ti) > cutoff.deleted)
+wine[outliers,]
+
+#now leverage
+all.values = influence.measures(FB.model.BIC)$infmat
+lev.hat = which(all.values[,"hat"] >2*p/n)
+lev.DF = which(all.values[,"dffit"] >1)
+lev.D = which(all.values[,"cook.d"] >qf(0.50,p,n-p))
+winex[lev.hat,]
+winex[lev.DF,] #nothing
+winex[lev.D,]#nothing
+
+#leverage point plus outliers
+wine[outliers,]
+wine[lev.hat,]
+OL <- c(14,16,18,20,39,43,44,46,80,82,833)
+wine_NOL <- wine[-OL,]
+
+Group = rep("Lower",nrow(wine_NOL)) #Creates a vector that repeats "Lower" n times
+Group[wine_NOL$quality > median(wine_NOL$quality)] = "Upper" #Changing the appropriate values to "Upper"
+Group = as.factor(Group) #Changes it to a factor, which R recognizes as a grouping variable.
+wine_NOL$Group = Group
+```
+
+Is this valid to rerun the stuff but without the outlier/lp. 
+It validates assumptions better than original but still not good... so do transform or alternate thing?
+```{r}
+winex2 <- wine_NOL
+winex2 <- winex2[,-13]
+colnames(winex2) <- c("x1","x2","x3","x4","x5","x6","x7","x8","x9","x10","x11","y")
+full_model2 <- lm(y~., data = winex2)
+empty_model2 <- lm(y~1, data = winex2)
+FB.model.BIC2 = stepAIC(empty_model2,  scope = list(lower = empty_model2, upper= full_model2), k = log(nrow(winex2)),trace=FALSE,direction = "both")
+
+shapiro.test(FB.model.BIC2$residuals)
+fligner.test(FB.model.BIC2$residuals, wine_NOL$Group)
+plot(FB.model.BIC2$fitted.values, FB.model.BIC2$residuals)
+```
+
+
+Trying colinearity stuff - ph and fixed acidity too high
+Try colinearity stuff. Can I use colinearity after something like BIC? What can I gleam off the graphs?
+So how do fix? binomial?
+
+```{r}
+vif(full_model) 
+vm <- lm(y ~ x1*x3+x1*x8+x1*x9+x2*x3+x3*x9+x8*x11+x2+x4+x5+x6+x7+x10, data = winex)
+shapiro.test(vm$residuals)
+fm <- lm(y~x2+x4+x5+x6+x7+x10, data = winex)
+
+before = stepAIC(empty_model,  scope = list(lower = empty_model, upper= fm), k = log(nrow(winex)),trace=FALSE,direction = "both")
+
+shapiro.test(before$residuals)
+fligner.test(before$residuals, wine$Group)
+
+before_vec <- before$fitted.values
+before_vec[aa] <- floor(before_vec[aa])
+before_vec[bb] <- ceiling(before_vec[bb])
+before_vec[cc] <- floor(before_vec[cc])
+before_vec[dd] <- ceiling(before_vec[dd])
+before_vec[ee] <- floor(before_vec[ee])
+before_vec[ff] <- ceiling(before_vec[ff])
+before_vec[gg] <- floor(before_vec[gg])
+before_vec[hh] <- ceiling(before_vec[hh])
+before_vec[ii] <- floor(before_vec[ii])
+before_vec[jj] <- ceiling(before_vec[jj])
+before_vec_residuals <- wine$quality - before_vec
+shapiro.test(before_vec_residuals)
+fligner.test(before_vec_residuals, wine$Group)
+```
+
+Lasso regression since want correct model - good xs are x2,x3,(x4 or x5),x10 so does that mean that's the model? What are the Bs?
+```{r}
+set.seed(123)
+y <- winex %>% dplyr::select(y) %>% scale(center = TRUE, scale = FALSE) %>% as.matrix()
+X <- winex %>% dplyr::select(-y) %>% as.matrix()
+lambdas_to_try <- 10^seq(-3, 5, length.out = 100)
+
+
+lasso_cv <- cv.glmnet(X, y, alpha = 1, lambda = lambdas_to_try,
+                      standardize = TRUE, nfolds = 10)
+plot(lasso_cv)
+grid = 10^seq(1, -2, length = 100)
+lasso_cv$lambda.min
+
+lasso_mod = glmnet(X, y, alpha = 1, lambda = 0.001)
+
+coef(lasso_mod)
+plot(lasso_mod)
+legend("bottomright", lwd = 1, col = 1:11, legend = colnames(X), cex = .7)
+bestlam <- lasso_mod$lambda.min
+lasso.pred <- predict(lasso_mod, s = bestlam, newx = X[,])
+lasso.coef  <- predict(lasso_mod, type = 'coefficients', s = bestlam)
+lasso.coef
+```
+Lasso fixed normality but not hetero
+```{r}
+test_model <- lm(y ~ x2+x3+x5+x10, data = winex)
+shapiro.test(test_model$coefficients)
+fligner.test(test_model$residuals, wine$Group)
+```
+
+TRYING POLYNOMIAL ON FB Selection 
+```{r}
+FB.model.BIC$coefficients
+with_int <- lm(y ~ x2 + x5+x7+x9+x10+x11+x9*x11, data = winex)
+shapiro.test(with_int$residuals)
+fligner.test(with_int$residuals,wine$Group)
+test$coefficients
+plot(winex$x11,winex$y)
+plot(winex$x10,winex$y)
+plot(winex$x9,winex$y)
+plot(winex$x7,winex$y)
+plot(winex$x5,winex$y)
+plot(winex$x2,winex$y)
+corrplot(datamatrix,method = "number") #potential cor with 9 and 11
+shapiro.test(FB.model.BIC$residuals)
+fligner.test(FB.model.BIC$residuals, wine$Group)
+plot(FB.model.BIC$fitted.values, FB.model.BIC$residuals)
+```
+
+```{r}
+columns <- c(2,5,7,9,10,11,12)
+centered <- winex[,columns]
+for (x in 1:6){
+  centered[,x] <- centered[,x] - mean(centered[,x])
+}
+no_poly <- lm(y~., data = centered)
+
+#x11 poly
+p1 <- lm(y ~ x2+x5+x7+x9+x10+x11+I(x11^2), data = centered)
+p2 <- lm(y ~ x2+x5+x7+x9+x10+x11+I(x11^2)+I(x11^3), data = centered)
+anova(p1,p2) #so since both anovas significant, test assumptions again with p2
+anova(no_poly,p2) 
+shapiro.test(p2$residuals) #no improvement
+fligner.test(p2$residuals, wine$Group) #improved fk a lot
+
+#x9 poly - pretty much same as x11 poly
+c1 <- lm(y ~ x2+x5+x7+x9+x10+x11+I(x9^2), data = centered)
+c2 <- lm(y ~ x2+x5+x7+x9+x10+x11+I(x9^2)+I(x9^3), data = centered)
+anova(c1,c2) #so since both anovas significant, test assumptions again with p2
+anova(no_poly,c2) 
+shapiro.test(c2$residuals) #no improvement
+fligner.test(c2$residuals, wine$Group) #improved fk a lot
+
+#so far this on performed best
+b1 <- lm(y ~ x2+x5+x7+x9+x10+x11+I(x11^2) + I(x9^2), data = centered)
+b2 <- lm(y ~ x2+x5+x7+x9+x10+x11+I(x11^2)+I(x11^3) + I(x9^3) + I(x9), data = centered)
+anova(b1,b2) #so since both anovas significant, test assumptions again with p2
+anova(no_poly,b2) 
+shapiro.test(b2$residuals) #no improvement
+fligner.test(b2$residuals, wine$Group) #improved fk a lot
+
+
+```
+
+Testing lasso coef with poly
+```{r}
+test_model <- lm(y ~ x2+x3+x5+x10, data = winex)
+input <- c(2,3,5,10)
+Lcentered <- winex[,input]
+for (x in 1:4){
+  Lcentered[,x] <- Lcentered[,x] - mean(Lcentered[,x])
+}
+
+noL_poly <- lm(y~., data = Lcentered)
+shapiro.test(noL_poly$residuals)
+fligner.test(noL_poly$residuals,wine$Group)
+
+n1 <- lm(y~x2+x3+x5+x10+I(x10^2),data = Lcentered)
+n2 <- lm(y~x2+x3+x5+x10+I(x10^2)+I(x10^3),data = Lcentered)
+anova(n1,n2)
+shapiro.test(n2$residuals) 
+fligner.test(n2$residuals, wine$Group)
+
+```
+
+
+```{r}
+
+```
+
+```{r}
+BC.xdata <- BC.data
+BC.xdata <- BC.xdata[,-13]
+colnames(BC.xdata) <- c("y","x1","x2","x3","x4","x5","x6","x7","x8","x9","x10","x11")
+
+#FB bic with BC - not more effective than jsut bc
+empty_model2 <- lm(y ~ 1, data = BC.xdata)
+full_model2 <- lm(y ~ ., data = BC.xdata)
+FBBC.BIC = stepAIC(empty_model2,  scope = list(lower = empty_model2, upper= full_model2), k = log(nrow(winex)),trace=FALSE,direction = "both")
+shapiro.test(FBBC.BIC$residuals)
+fligner.test(FBBC.BIC$residuals, BC.data$Group)
+
+#lasso variables with BC
+BCcenter <- BC.xdata
+for (x in 2:11){
+  BCcenter[,x] <- BCcenter[,x] - mean(BCcenter[,x])
+}
+LBC <- lm(y ~ x2+x7+x5+x9+x11+x10+I(x2^2)+I(x2^3), data = BCcenter)
+shapiro.test(LBC$residuals)
+fligner.test(LBC$residuals, BC.data$Group)
+```
+
+log transform
+```{r}
+winexlog <- winex
+winexlog$y <- (winexlog$y)^(1/3)
+
+empty_model3 <- lm(y ~ 1, data = winexlog)
+full_model3 <- lm(y ~ ., data = winexlog)
+logm = stepAIC(empty_model3,  scope = list(lower = empty_model3, upper= full_model3), k = log(nrow(winex)),trace=FALSE,direction = "both")
+
+Group = rep("Lower",nrow(wine)) #Creates a vector that repeats "Lower" n times
+Group[winexlog$y > median(winexlog$y)] = "Upper" #Changing the appropriate values to "Upper"
+Group = as.factor(Group) #Changes it to a factor, which R recognizes as a grouping variable.
+winexlog$Group = Group
+
+shapiro.test(logm$residuals)
+fligner.test(logm$residuals, winexlog$Group)
+
+lm(y ~ x2+x3+x5+x10, data = winex)
+#now with poly
+cube1 <- lm(y ~ x2+x3+x5+x10, data = winexlog)
+shapiro.test(cube1$residuals)
+fligner.test(cube1$residuals,winexlog$Group)
+```
+
+Reworking leverage
+```{r}
+#leverage point plus outliers
+wine[outliers,]
+wine[lev.hat,]
+OL <- c(lev.hat,outliers)
+wine_NOL <- wine[-OL,]
+
+Group = rep("Lower",nrow(wine_NOL)) #Creates a vector that repeats "Lower" n times
+Group[wine_NOL$quality > median(wine_NOL$quality)] = "Upper" #Changing the appropriate values to "Upper"
+Group = as.factor(Group) #Changes it to a factor, which R recognizes as a grouping variable.
+wine_NOL$Group = Group
+
+wine_NOL_ng <- wine_NOL[,-13]
+colnames(wine_NOL_ng) <- c("x1","x2","x3","x4","x5","x6","x7","x8","x9","x10","x11","y")
+empty_model4 <- lm(y ~ 1, data = wine_NOL_ng)
+full_model4 <- lm(y ~ ., data = wine_NOL_ng)
+
+FBNOL = stepAIC(empty_model4,  scope = list(lower = empty_model4, upper= full_model4), k = log(nrow(wine_NOL)),trace=FALSE,direction = "both")
+
+shapiro.test(FBNOL$residuals)
+fligner.test(FBNOL$residuals,wine_NOL$Group)
+FBNOL$coefficients
+
+#now with polyw
+
+
+please <- lm(y~x2+x3+x7+x9+x10+x11+x11*x10, data = wine_NOL_ng)
+shapiro.test(please$residuals)
+fligner.test(please$residuals,wine_NOL$Group)
+
+
+nol_center <- wine_NOL_ng
+for (x in 1:11){
+  nol_center[,x] <- nol_center[,x] - mean(nol_center[,x])
+}
+
+hm <- lm(y~x2+x7+x10+I(x10^2)+I(x10^3), data = nol_center)
+shapiro.test(hm$residuals)
+fligner.test(hm$residuals,wine_NOL$Group)
+```
+
+ROUND UP OR DOWN AND THEN TEST ASSUMPTIONS
+
+SO FAR HERE ARE THE BEST MODELS
+```{r}
+#FB selection coef with x11 poly - better FK
+p2 <- lm(y ~ x2+x5+x7+x9+x10+x11+I(x11^2)+I(x11^3), data = centered)
+shapiro.test(p2$residuals)$p 
+fligner.test(p2$residuals, wine$Group)$p.value
+
+#lasso variables - better normality
+test_model <- lm(y ~ x2+x3+x5+x10, data = winex)
+shapiro.test(test_model$residuals)
+fligner.test(test_model$residuals, wine$Group)
+
+#lasso variables with BC
+LBC <- lm(y ~ x2+x7+x5+x9+x11+x10+I(x2^2)+I(x2^3), data = BCcenter)
+shapiro.test(LBC$residuals)
+fligner.test(LBC$residuals, BC.data$Group)
+
+#outlier and leverage removed
+please <- lm(y~x2+x3+x7+x9+x10+x11+x11*x10, data = wine_NOL_ng)
+shapiro.test(please$residuals)
+fligner.test(please$residuals,wine_NOL$Group)
+
+results <- data.frame("Model" = c("FB Poly",
+                                  "Lasso",
+                                  "Lasso + BC",
+                                  "Lasoo+NoL"),
+                      "Shapiro" = c(shapiro.test(p2$residuals)$p,
+                                    shapiro.test(test_model$residuals)$p,
+                                    shapiro.test(LBC$residuals)$p,
+                                    shapiro.test(please$residuals)$p),
+                      "FK" = c(fligner.test(p2$residuals, wine$Group)$p.value,
+                               fligner.test(test_model$residuals, wine$Group)$p.value,
+                               fligner.test(LBC$residuals, BC.data$Group)$p.value,
+                               fligner.test(please$residuals,wine_NOL$Group)$p.value)
+                      )
+results
+```
+
+trying to round 
+```{r}
+p2 #FB poly
+test_model #lasso
+LBC #lasso on BC transform
+please #outlier/leverage removed, lasso plus interaction
+
+
+aa <- p2_vec >= 3 & p2_vec < 3.5
+bb <- p2_vec >= 3.5 & p2_vec < 4
+cc <- p2_vec >= 4 & p2_vec < 4.5
+dd <- p2_vec >= 4.5 & p2_vec < 5
+ee <- p2_vec >= 5 & p2_vec < 5.5
+ff <- p2_vec >= 5.5 & p2_vec < 6
+gg <- p2_vec >= 6 & p2_vec < 6.5
+hh <- p2_vec >= 6.5 & p2_vec < 7
+ii <- p2_vec >= 7 & p2_vec < 7.5
+jj <- p2_vec >= 7.5 & p2_vec <= 8
+
+p2_vec <- as.double(p2[[5]])
+
+# Apply ceiling to elements that meet the condition
+p2_vec[aa] <- floor(p2_vec[aa])
+p2_vec[bb] <- ceiling(p2_vec[bb])
+p2_vec[cc] <- floor(p2_vec[cc])
+p2_vec[dd] <- ceiling(p2_vec[dd])
+p2_vec[ee] <- floor(p2_vec[ee])
+p2_vec[ff] <- ceiling(p2_vec[ff])
+p2_vec[gg] <- floor(p2_vec[gg])
+p2_vec[hh] <- ceiling(p2_vec[hh])
+p2_vec[ii] <- floor(p2_vec[ii])
+p2_vec[jj] <- ceiling(p2_vec[jj])
+
+p2_vec_residuals <- wine$quality - p2_vec
+shapiro.test(p2_vec_residuals)
+fligner.test(p2_vec_residuals, wine$Group)
+
+
+test_model_vec <- test_model$fitted.values
+test_model_vec[aa] <- floor(test_model_vec[aa])
+test_model_vec[bb] <- ceiling(test_model_vec[bb])
+test_model_vec[cc] <- floor(test_model_vec[cc])
+test_model_vec[dd] <- ceiling(test_model_vec[dd])
+test_model_vec[ee] <- floor(test_model_vec[ee])
+test_model_vec[ff] <- ceiling(test_model_vec[ff])
+test_model_vec[gg] <- floor(test_model_vec[gg])
+test_model_vec[hh] <- ceiling(test_model_vec[hh])
+test_model_vec[ii] <- floor(test_model_vec[ii])
+test_model_vec[jj] <- ceiling(test_model_vec[jj])
+test_model_vec_residuals <- wine$quality - test_model_vec
+
+shapiro.test(test_model_vec_residuals)
+fligner.test(test_model_vec_residuals, wine$Group) #ACTUAL CONSTANTCY
+
+
+LBC_vec <- LBC$fitted.values
+LBC_vec[aa] <- floor(LBC_vec[aa])
+LBC_vec[bb] <- ceiling(LBC_vec[bb])
+LBC_vec[cc] <- floor(LBC_vec[cc])
+LBC_vec[dd] <- ceiling(LBC_vec[dd])
+LBC_vec[ee] <- floor(LBC_vec[ee])
+LBC_vec[ff] <- ceiling(LBC_vec[ff])
+LBC_vec[gg] <- floor(LBC_vec[gg])
+LBC_vec[hh] <- ceiling(LBC_vec[hh])
+LBC_vec[ii] <- floor(LBC_vec[ii])
+LBC_vec[jj] <- ceiling(LBC_vec[jj])
+LBC_vec_residuals <- wine$quality - LBC_vec
+shapiro.test(LBC_vec_residuals)
+fligner.test(LBC_vec_residuals, BC.data$Group)
+
+please_vec <- please$fitted.values
+please_vec[aa] <- floor(please_vec[aa])
+please_vec[bb] <- ceiling(please_vec[bb])
+please_vec[cc] <- floor(please_vec[cc])
+please_vec[dd] <- ceiling(please_vec[dd])
+please_vec[ee] <- floor(please_vec[ee])
+please_vec[ff] <- ceiling(please_vec[ff])
+please_vec[gg] <- floor(please_vec[gg])
+please_vec[hh] <- ceiling(please_vec[hh])
+please_vec[ii] <- floor(please_vec[ii])
+please_vec[jj] <- ceiling(please_vec[jj])
+please_vec_residuals <- wine_NOL$quality - please_vec
+
+shapiro.test(please_vec_residuals)
+fligner.test(please_vec_residuals, wine_NOL$Group)
+```
+
+BEST MODEL THUS FAR
+```{r}
+test_model_vec <- test_model$fitted.values
+test_model_vec[aa] <- floor(test_model_vec[aa])
+test_model_vec[bb] <- ceiling(test_model_vec[bb])
+test_model_vec[cc] <- floor(test_model_vec[cc])
+test_model_vec[dd] <- ceiling(test_model_vec[dd])
+test_model_vec[ee] <- floor(test_model_vec[ee])
+test_model_vec[ff] <- ceiling(test_model_vec[ff])
+test_model_vec[gg] <- floor(test_model_vec[gg])
+test_model_vec[hh] <- ceiling(test_model_vec[hh])
+test_model_vec[ii] <- floor(test_model_vec[ii])
+test_model_vec[jj] <- ceiling(test_model_vec[jj])
+test_model_vec_residuals <- wine$quality - test_model_vec
+
+shapiro.test(test_model_vec_residuals)
+fligner.test(test_model_vec_residuals, wine$Group) 
+plot(test_model_vec_residuals, wine$quality)
+test_model$coefficients
+qqnorm(test_model_vec_residuals)
+qqline(test_model_vec_residuals)
+```
+
+ACTUAL BEST MODELS
+```{r}
+#removing vif variables then model selection and rounding
+before$coefficients
+shapiro.test(before_vec_residuals)
+fligner.test(before_vec_residuals, wine$Group)
+
+#lasso variables and rounding
+test_model$coefficients
+shapiro.test(test_model_vec_residuals)
+fligner.test(test_model_vec_residuals, wine$Group)
+
+#log transform on x's plus fb selection
+logfb$coefficients
+shapiro.test(logfb$residuals)
+fligner.test(logfb$residuals, wine$Group)
+
+#above with rounding
+shapiro.test(logfb_vec_residuals)
+fligner.test(logfb_vec_residuals, wine$Group)
+
+#same as above but with rounding and removing VIF>2.5
+logfbrem$coefficients
+shapiro.test(logfbrem_vec_residuals)
+fligner.test(logfbrem_vec_residuals, wine$Group)
+```
+
+TUKEY on x's
+```{r}
+tukeyx1 <- transformTukey(winex$x1, plotit = F)
+tukeyx2 <- transformTukey(winex$x2, plotit = F)
+tukeyx3 <- transformTukey(winex$x3, plotit = F)
+tukeyx4 <- transformTukey(winex$x4, plotit = F)
+tukeyx5 <- transformTukey(winex$x5, plotit = F)
+tukeyx6 <- transformTukey(winex$x6, plotit = F)
+tukeyx7 <- transformTukey(winex$x7, plotit = F)
+tukeyx8 <- transformTukey(winex$x8, plotit = F)
+tukeyx9 <- transformTukey(winex$x9, plotit = F)
+tukeyx10 <- transformTukey(winex$x10, plotit = F)
+tukeyx11 <- transformTukey(winex$x11, plotit = F)
+tukeyy <- transformTukey(winex$y, plotit = F)
+T.Data = data.frame(y = tukeyy,
+                    x1 = tukeyx1,
+                    x2 = tukeyx2,
+                    x3 = tukeyx3,
+                    x4 = tukeyx4,
+                    x5 = tukeyx5,
+                    x6 = tukeyx6,
+                    x7 = tukeyx7,
+                    x8 = tukeyx8,
+                    x9 = tukeyx9,
+                    x10 = tukeyx10,
+                    x11 = tukeyx11)
+
+eeeme <- lm(y~1, data = T.Data)
+ffffmf <- lm(y~., data = T.Data)
+tuke = stepAIC(eeeme,  scope = list(lower = eeeme, upper= ffffmf), k = log(nrow(winex)),trace=FALSE,direction = "both")
+Group = rep("Lower",nrow(wine)) #Creates a vector that repeats "Lower" n times
+Group[T.Data$y > median(T.Data$y)] = "Upper" #Changing the appropriate values to "Upper"
+Group = as.factor(Group) #Changes it to a factor, which R recognizes as a grouping variable.
+T.Data$Group = Group
+shapiro.test(tuke$residuals)
+fligner.test(tuke$residuals,T.Data$Group)
+```
+
+Try some basic transformations on the x variables
+```{r}
+hist(wine$volatile.acidity)
+hist(winex$x3)
+hist(winex$x7)
+hist(winex$x5)
+hist(winex$x10)
+logwinex <- winex
+logwinex$x1 <- log(winex$x1)
+logwinex$x2 <- log(winex$x2)
+logwinex$x3 <- (winex$x3)^1/2
+logwinex$x7 <- log(winex$x7)
+logwinex$x5 <- log(winex$x5)
+logwinex$x6 <- log(winex$x6)
+logwinex$x10 <- log(winex$x10)
+logwinex$x11 <- log(winex$x11)
+best2 <- lm(y~x2+x7+x5+x10, data = logwinex)
+best1 <- lm(y~x2+x3+x5+x10, data = logwinex)
+shapiro.test(best2$residuals)
+fligner.test(best2$residuals, wine$Group)
+shapiro.test(best1$residuals)
+fligner.test(best1$residuals, wine$Group)
+
+```
+
+```{r}
+#no need for 8,9,4, log with fb selection
+eeeem <- lm(y~1, data = logwinex)
+fffffm <- lm(y~., data = logwinex)
+logfb = stepAIC(eeeem,  scope = list(lower = eeeem, upper= fffffm), k = log(nrow(winex)),trace=FALSE,direction = "both")
+shapiro.test(logfb$residuals)
+fligner.test(logfb$residuals, wine$Group)
+logfb$coefficients #remove x11,x9 for vif - NOPE
+logfbrem <- lm(y~x2+x10+x5+x9+x6+x7, data = logwinex)
+shapiro.test(logfbrem$residuals)
+fligner.test(logfbrem$residuals, wine$Group)
+
+
+
+#rounding
+logfb_vec <- as.double(logfb[[5]])
+
+# Apply ceiling to elements that meet the condition
+logfb_vec[aa] <- floor(logfb_vec[aa])
+logfb_vec[bb] <- ceiling(logfb_vec[bb])
+logfb_vec[cc] <- floor(logfb_vec[cc])
+logfb_vec[dd] <- ceiling(logfb_vec[dd])
+logfb_vec[ee] <- floor(logfb_vec[ee])
+logfb_vec[ff] <- ceiling(logfb_vec[ff])
+logfb_vec[gg] <- floor(logfb_vec[gg])
+logfb_vec[hh] <- ceiling(logfb_vec[hh])
+logfb_vec[ii] <- floor(logfb_vec[ii])
+logfb_vec[jj] <- ceiling(logfb_vec[jj])
+
+logfb_vec_residuals <- wine$quality - logfb_vec
+shapiro.test(logfb_vec_residuals)
+fligner.test(logfb_vec_residuals, wine$Group)
+
+
+
+logfbrem_vec <- as.double(logfbrem[[5]])
+
+# Apply ceiling to elements that meet the condition
+logfbrem_vec[aa] <- floor(logfbrem_vec[aa])
+logfbrem_vec[bb] <- ceiling(logfbrem_vec[bb])
+logfbrem_vec[cc] <- floor(logfbrem_vec[cc])
+logfbrem_vec[dd] <- ceiling(logfbrem_vec[dd])
+logfbrem_vec[ee] <- floor(logfbrem_vec[ee])
+logfbrem_vec[ff] <- ceiling(logfbrem_vec[ff])
+logfbrem_vec[gg] <- floor(logfbrem_vec[gg])
+logfbrem_vec[hh] <- ceiling(logfbrem_vec[hh])
+logfbrem_vec[ii] <- floor(logfbrem_vec[ii])
+logfbrem_vec[jj] <- ceiling(logfbrem_vec[jj])
+
+logfbrem_vec_residuals <- wine$quality - logfbrem_vec
+shapiro.test(logfbrem_vec_residuals)
+fligner.test(logfbrem_vec_residuals, wine$Group)
+```
+
+Final Model
+```{r}
+logfbrem$coefficients
+shapiro.test(logfbrem_vec_residuals)
+fligner.test(logfbrem_vec_residuals, wine$Group)
+qqnorm(logfb_vec_residuals)
+qqline(logfb_vec_residuals)
+plot(x = wine$quality, y = logfb_vec_residuals, main = "Residual Plot", xlab = "Quality", ylab = "Residuals")
+abline(h = 0, col = "red", lwd = 2)
+```
