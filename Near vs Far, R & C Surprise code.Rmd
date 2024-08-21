@@ -5,15 +5,7 @@ date: "2024-01-12"
 output: html_document
 ---
 
-Done 1. S01 (0316, March 16th), S17, S18: These are the participants with only one fMRI data (fMRI1) recorded. Due to either problem with machine or behavior
 
-Done 2. S09: The fMRI2 (day 2) of this participant is in S01 (0508, May 8th). This is because the same schedule for S01 is being used for S09 during the second day of fMRI data collection.
-
-Done 3. S24: The data collected for this participant is not valid, and we would like to ignore the data collected.
-
-Done other than missing template on s45 4. S05,S45: Cannot use only r3 to acces the fMRI (fMRI1 for S05 and fMRI2 for S45) data for these particpants, since there were some problems with the running program. Solution is to access combine valid data in r1,r2,r3 together.
-
-Done 5. For all other participants. we can use only the r3 data file to access interested part of data.
 
 
 
